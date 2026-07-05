@@ -32,15 +32,16 @@ TEST_PATH = os.path.join(BASE_DIR, "rt_iot2022_preprocessing", "test.csv")
 TARGET_COL = "Attack_type"
 RANDOM_STATE = 42
 
-# Konfigurasi MLflow
+# =========================================================================
+# PERBAIKAN 1: ISOLASI PERINTAH EXPERIMENT AGAR TIDAK TABRAKAN DI GITHUB CI
+# =========================================================================
 if "GITHUB_ACTIONS" in os.environ:
-    # Jika berjalan di GitHub CI
+    # Jika berjalan di GitHub CI, lewati set_experiment agar mengikuti bawaan MLProject
     mlflow.set_tracking_uri(f"file:{os.path.join(BASE_DIR, 'mlruns')}")
 else:
-    # Jika berjalan di laptop/WSL Anda
+    # Jika berjalan di laptop/WSL Anda, jalankan seperti biasa secara normal
     mlflow.set_tracking_uri("http://127.0.0.1:5000")
-
-mlflow.set_experiment("IoT-Network-Intrusion-Detection")
+    mlflow.set_experiment("IoT-Network-Intrusion-Detection")
 
 
 def load_split_data(custom_clean_path=None):
@@ -84,23 +85,25 @@ def main(custom_path=None, n_estimators=100, custom_seed=42):
 
     print("[1/3] Menginisialisasi sesi pencatatan MLflow...")
     
-    # Menggunakan nested=True agar aman dari tabrakan ID di GitHub Actions
-    with mlflow.start_run(run_name="rf_ids_baseline_classifier", nested=True):
-        
-        # Menggunakan model standar Random Forest dengan parameter dinamis
-        model = RandomForestClassifier(
-            n_estimators=n_estimators,
-            random_state=custom_seed,
-        )
-        
-        print("[2/3] Melatih arsitektur Random Forest pada log lalu lintas RT-IoT2022")
+    # =========================================================================
+    # PERBAIKAN 2: GUNAKAN KONDISI IF/ELSE UNTUK BERBAGI AKSES RUN ID SENSITIF
+    # =========================================================================
+    if "GITHUB_ACTIONS" in os.environ:
+        # Jika di GitHub Actions, langsung latih model mengikuti sesi MLProject yang sudah aktif
+        model = RandomForestClassifier(n_estimators=n_estimators, random_state=custom_seed)
+        print("[2/3] Melatih arsitektur Random Forest via pipa otomatisasi CI...")
         model.fit(X_train, y_train)
-
-        # Evaluasi akurasi metrik data uji
         acc = model.score(X_test, y_test)
-        print(f"[3/3] Evaluasi Berhasil. Akurasi Pengujian: {acc:.4f}")
-        print("Parameter operasional, visualisasi metrik, dan artefak disimpan di server")
-
+        print(f"[3/3] Evaluasi Berhasil. Akurasi Pengujian CI: {acc:.4f}")
+    else:
+        # Jika di komputer lokal Anda, jalankan blok start_run alami milik Anda seperti biasa
+        with mlflow.start_run(run_name="rf_ids_baseline_classifier"):
+            model = RandomForestClassifier(n_estimators=n_estimators, random_state=custom_seed)
+            print("[2/3] Melatih arsitektur Random Forest pada log lalu lintas RT-IoT2022")
+            model.fit(X_train, y_train)
+            acc = model.score(X_test, y_test)
+            print(f"[3/3] Evaluasi Berhasil. Akurasi Pengujian Lokal: {acc:.4f}")
+            print("Parameter operasional, visualisasi metrik, dan artefak disimpan di server")
 
 
 if __name__ == "__main__":
