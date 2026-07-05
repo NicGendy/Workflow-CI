@@ -1,0 +1,36 @@
+name: CI - Retrain RT-IoT2022 Model
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "MLProject/**"
+  workflow_dispatch: {}
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.7"
+
+      - name: Install MLflow & dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install mlflow==2.19.0 pandas==2.2.2 numpy==1.26.4 scikit-learn==1.5.1
+
+      - name: Run MLflow Project (training)
+        working-directory: ./MLProject
+        run: |
+          mlflow run . --env-manager=local
+
+      - name: Show mlruns artifact folder
+        working-directory: ./MLProject
+        run: |
+          ls -R mlruns || echo "mlruns folder not found"
