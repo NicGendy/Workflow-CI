@@ -84,22 +84,22 @@ def main(custom_path=None, n_estimators=100, custom_seed=42):
 
     print("[1/3] Menginisialisasi sesi pencatatan MLflow...")
     
-    # Mendeteksi apakah sudah ada sesi run aktif dari MLProject GitHub Actions
-    if mlflow.active_run():
-        # Jika dijalankan oleh GitHub CI
-        model = RandomForestClassifier(n_estimators=n_estimators, random_state=custom_seed)
-        print("[2/3] Melatih arsitektur Random Forest via pipa otomatisasi CI")
+    # Menggunakan nested=True agar aman dari tabrakan ID di GitHub Actions
+    with mlflow.start_run(run_name="rf_ids_baseline_classifier", nested=True):
+        
+        # Menggunakan model standar Random Forest dengan parameter dinamis
+        model = RandomForestClassifier(
+            n_estimators=n_estimators,
+            random_state=custom_seed,
+        )
+        
+        print("[2/3] Melatih arsitektur Random Forest pada log lalu lintas RT-IoT2022")
         model.fit(X_train, y_train)
+
+        # Evaluasi akurasi metrik data uji
         acc = model.score(X_test, y_test)
-        print(f"[3/3] Evaluasi Berhasil. Akurasi Pengujian CI: {acc:.4f}")
-    else:
-        # Jika dijalankan manual di laptop/WSL Anda
-        with mlflow.start_run(run_name="rf_ids_baseline_classifier"):
-            model = RandomForestClassifier(n_estimators=n_estimators, random_state=custom_seed)
-            print("[2/3] Melatih arsitektur Random Forest pada log lalu lintas RT-IoT2022")
-            model.fit(X_train, y_train)
-            acc = model.score(X_test, y_test)
-            print(f"[3/3] Evaluasi Berhasil. Akurasi Pengujian Lokal: {acc:.4f}")
+        print(f"[3/3] Evaluasi Berhasil. Akurasi Pengujian: {acc:.4f}")
+        print("Parameter operasional, visualisasi metrik, dan artefak disimpan di server")
 
 
 
