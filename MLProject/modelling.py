@@ -18,10 +18,10 @@ Catatan Penting:
 """
 
 import os
+import argparse
 import pandas as pd
 import mlflow
 import mlflow.sklearn
-
 from sklearn.ensemble import RandomForestClassifier
 
 # Konfigurasi Jalur Data & Parameter
@@ -37,8 +37,20 @@ mlflow.set_tracking_uri("http://127.0.0.1:5000")
 mlflow.set_experiment("IoT-Network-Intrusion-Detection")
 
 
-def load_split_data():
+def load_split_data(custom_clean_path=None):
     """Memuat data train dan test hasil dari kriteria 1 secara langsung."""
+    # Jika dijalankan di server GitHub Actions
+    if custom_clean_path:
+        if not os.path.exists(custom_clean_path):
+            raise FileNotFoundError(f"Berkas data tidak ditemukan di {custom_clean_path}")
+        df = pd.read_csv(custom_clean_path)
+        # Memisahkan data latih/uji manual agar fit dan score tetap berjalan normal di server GitHub
+        from sklearn.model_selection import train_test_split
+        X = df.drop(columns=[TARGET_COL])
+        y = df[TARGET_COL]
+        return train_test_split(X, y, test_size=0.2, random_state=RANDOM_STATE, stratify=y)
+
+    # Jika dijalankan secara lokal
     if not os.path.exists(TRAIN_PATH) or not os.path.exists(TEST_PATH):
         raise FileNotFoundError(
             f"Berkas data tidak ditemukan di folder 'rt_iot2022_preprocessing'. "
@@ -57,9 +69,9 @@ def load_split_data():
     return X_train, X_test, y_train, y_test
 
 
-def main():
+def main(custom_path=None, n_estimators=100, custom_seed=42):
     # Memuat dataset trafik jaringan IoT
-    X_train, X_test, y_train, y_test = load_split_data()
+    X_train, X_test, y_train, y_test = load_split_data(custom_path)
 
     # Mengaktifkan autolog tracking
     mlflow.sklearn.autolog()
@@ -68,20 +80,37 @@ def main():
     # Mengganti run_name menjadi representatif (Model Utama IDS)
     with mlflow.start_run(run_name="rf_ids_baseline_classifier"):
         
-        # Menggunakan model standar Random Forest
+        # Menggunakan model standar Random Forest dengan parameter dinamis
         model = RandomForestClassifier(
-            n_estimators=100,
-            random_state=RANDOM_STATE,
+            n_estimators=n_estimators,
+            random_state=custom_seed,
         )
         
-        print("[2/3] Melatih arsitektur Random Forest pada log lalu lintas RT-IoT2022...")
+        print("[2/3] Melatih arsitektur Random Forest pada log lalu lintas RT-IoT2022")
         model.fit(X_train, y_train)
 
         # Evaluasi akurasi metrik data uji
         acc = model.score(X_test, y_test)
         print(f"[3/3] Evaluasi Berhasil. Akurasi Pengujian: {acc:.4f}")
-        print("Parameter operasional, visualisasi metrik, dan artefak disimpan di server lokal.")
+        print("Parameter operasional, visualisasi metrik, dan artefak disimpan di server")
 
 
 if __name__ == "__main__":
-    main()
+    # Menambahkan argumen baris perintah untuk integrasi MLProject
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data_path", type=str, default=None)
+    parser.add_argument("--n_estimators", type=int, default=100)
+    parser.add_argument("--random_state", type=int, default=42)
+    args = parser.parse_args()
+
+    # Jika dipanggil via MLProject, konversi jalur relatif menjadi absolut
+    clean_data_path = None
+    if args.data_path:
+        clean_data_path = os.path.abspath(os.path.join(BASE_DIR, args.data_path))
+
+    # Oper nilai argumen ke dalam fungsi main asli Anda
+    main(
+        custom_path=clean_data_path, 
+        n_estimators=args.n_estimators, 
+        custom_seed=args.random_state
+    )
