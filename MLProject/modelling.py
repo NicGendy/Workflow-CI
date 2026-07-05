@@ -32,8 +32,14 @@ TEST_PATH = os.path.join(BASE_DIR, "rt_iot2022_preprocessing", "test.csv")
 TARGET_COL = "Attack_type"
 RANDOM_STATE = 42
 
-# Konfigurasi MLflow Lokal
-mlflow.set_tracking_uri("http://127.0.0.1:5000")
+# Konfigurasi MLflow
+if "GITHUB_ACTIONS" in os.environ:
+    # Jika berjalan di GitHub CI
+    mlflow.set_tracking_uri(f"file:{os.path.join(BASE_DIR, 'mlruns')}")
+else:
+    # Jika berjalan di laptop/WSL Anda
+    mlflow.set_tracking_uri("http://127.0.0.1:5000")
+
 mlflow.set_experiment("IoT-Network-Intrusion-Detection")
 
 
